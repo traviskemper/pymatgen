@@ -1,5 +1,9 @@
 **Official docs:** http://www.pymatgen.org
 
+Remove everything but the core to build streamm off of.
+
+Travis Kemper
+
 Pymatgen (Python Materials Genomics) is a robust, open-source Python library
 for materials analysis. These are some of the main features:
 
