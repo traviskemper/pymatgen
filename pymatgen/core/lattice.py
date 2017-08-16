@@ -29,8 +29,12 @@ from scipy.spatial import Voronoi
 
 from monty.json import MSONable
 from monty.dev import deprecated
-from pymatgen.util.num_utils import abs_cap
-from pymatgen.core.units import ArrayWithUnit
+
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', 'util')))
+from util.num_utils import abs_cap
+
+from units import ArrayWithUnit
 
 
 class Lattice(MSONable):

@@ -19,9 +19,14 @@ __date__ = "Dec 10, 2012"
 import re
 import numpy as np
 
-from pymatgen.core.composition import Composition
+from composition import Composition
 from monty.json import MSONable
-from pymatgen.util.string_utils import formula_double_format
+
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', 'util')))
+
+
+from string_utils import formula_double_format
 
 
 class Ion(MSONable):

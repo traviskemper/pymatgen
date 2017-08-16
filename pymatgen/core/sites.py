@@ -19,12 +19,16 @@ __date__ = "Jul 17, 2012"
 import collections
 import numpy as np
 
-from pymatgen.core.lattice import Lattice
-from pymatgen.core.periodic_table import Element, Specie, DummySpecie,\
+from lattice import Lattice
+from periodic_table import Element, Specie, DummySpecie,\
     get_el_sp
 from monty.json import MSONable
-from pymatgen.util.coord_utils import pbc_diff
-from pymatgen.core.composition import Composition
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', 'util')))
+
+
+from coord_utils import pbc_diff
+from composition import Composition
 
 
 class Site(collections.Hashable, MSONable):

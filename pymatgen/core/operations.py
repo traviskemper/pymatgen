@@ -24,7 +24,6 @@ __email__ = "shyuep@gmail.com"
 __status__ = "Production"
 __date__ = "Sep 23, 2011"
 
-
 class SymmOp(MSONable):
     """
     A symmetry operation in cartesian space. Consists of a rotation plus a

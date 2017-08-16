@@ -29,10 +29,14 @@ from fractions import Fraction
 from functools import total_ordering
 
 from monty.fractions import gcd, lcm
-from pymatgen.core.periodic_table import get_el_sp, Element
-from pymatgen.util.string_utils import formula_double_format
+from periodic_table import get_el_sp, Element
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', 'util')))
+
+from string_utils import formula_double_format
 from monty.json import MSONable
-from pymatgen.core.units import unitized
+
+from units import unitized
 
 
 @total_ordering
