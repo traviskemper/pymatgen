@@ -4,15 +4,18 @@
 
 from __future__ import division, unicode_literals, print_function
 
-import os
-import re
-import json
+import os, json, re, sys
 from io import open
 from enum import Enum
 
-from pymatgen.core.units import Mass, Length, unitized, FloatWithUnit, Unit, \
+from units import Mass, Length, unitized, FloatWithUnit, Unit, \
     SUPPORTED_UNIT_NAMES
-from pymatgen.util.string_utils import formula_double_format
+
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', 'util')))
+
+from string_utils import formula_double_format
+
 from monty.json import MSONable
 from monty.dev import deprecated
 

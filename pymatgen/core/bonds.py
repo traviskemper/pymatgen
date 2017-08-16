@@ -22,7 +22,7 @@ import os
 import json
 import collections
 
-from pymatgen.core.periodic_table import get_el_sp
+from periodic_table import get_el_sp
 
 
 def _load_bond_length_data():
