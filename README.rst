@@ -1,8 +1,11 @@
 **Official docs:** http://www.pymatgen.org
 
-Remove everything but the core to build streamm off of.
+This is light version of pymatgen that only includes:
 
-Travis Kemper
+    pymatgen.core.periodic_table
+    pymatgen.core.units
+    pymatgen.util.string
+
 
 Pymatgen (Python Materials Genomics) is a robust, open-source Python library
 for materials analysis. These are some of the main features:
