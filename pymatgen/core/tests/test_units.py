@@ -7,15 +7,16 @@ from __future__ import division, unicode_literals
 import collections
 
 import unittest2 as unittest
+import numpy.testing.utils as nptu
 
 
-from pymatgen.util.testing import PymatgenTest
+# from pymatgen.util.testing import unittest.TestCase
 from pymatgen.core.units import (Energy, Time, Length, unitized, Mass, Memory,
                                  EnergyArray, TimeArray, LengthArray, Unit,
                                  FloatWithUnit, ArrayWithUnit, UnitError)
 
 
-class UnitTest(PymatgenTest):
+class UnitTest(unittest.TestCase):
 
     def test_init(self):
         u1 = Unit((("m", 1), ("s", -1)))
@@ -32,7 +33,7 @@ class UnitTest(PymatgenTest):
         self.assertEqual(str(newton * Unit("m")), "N m")
 
 
-class FloatWithUnitTest(PymatgenTest):
+class FloatWithUnitTest(unittest.TestCase):
 
     def test_energy(self):
         a = Energy(1.1, "eV")
@@ -138,10 +139,10 @@ class FloatWithUnitTest(PymatgenTest):
 
     def test_as_base_units(self):
         x = FloatWithUnit(5, "MPa")
-        self.assert_equal(FloatWithUnit(5000000, "Pa"), x.as_base_units)
+        nptu.assert_equal(FloatWithUnit(5000000, "Pa"), x.as_base_units)
 
 
-class ArrayWithFloatWithUnitTest(PymatgenTest):
+class ArrayWithFloatWithUnitTest(unittest.TestCase):
 
     def test_energy(self):
         """
@@ -250,23 +251,8 @@ class ArrayWithFloatWithUnitTest(PymatgenTest):
 
     def test_as_base_units(self):
         x = ArrayWithUnit([5, 10], "MPa")
-        self.assert_equal(ArrayWithUnit([5000000, 10000000], "Pa"), x.as_base_units)
+        nptu.assert_equal(ArrayWithUnit([5000000, 10000000], "Pa"), x.as_base_units)
 
-
-class DataPersistenceTest(PymatgenTest):
-    def test_pickle(self):
-        """Test whether FloatWithUnit and ArrayWithUnit support pickle"""
-
-        for cls in [FloatWithUnit, ArrayWithUnit]:
-            a = cls(1, "eV")
-            b = cls(10, "N bohr")
-            objects = [a, b]
-
-            new_objects_from_protocol = self.serialize_with_pickle(objects)
-
-            for new_objects in new_objects_from_protocol:
-                for old_item, new_item in zip(objects, new_objects):
-                    self.assertTrue(str(old_item) == str(new_item))
 
 
 if __name__ == '__main__':
