@@ -9,7 +9,6 @@ import collections
 import unittest2 as unittest
 import numpy.testing.utils as nptu
 
-
 # from pymatgen.util.testing import unittest.TestCase
 from pymatgen.core.units import (Energy, Time, Length, unitized, Mass, Memory,
                                  EnergyArray, TimeArray, LengthArray, Unit,
@@ -25,7 +24,7 @@ class UnitTest(unittest.TestCase):
         self.assertEqual(str(u2), "J")
         self.assertEqual(str(u1 * u2), "J m s^-1")
         self.assertEqual(str(u2 / u1), "J s m^-1")
-        self.assertEqual(str(u1 / Unit("m")), "s^-1")
+        self.assertEqual(str(u1 / Unit("m")), "Hz")
         self.assertEqual(str(u1 * Unit("s")), "m")
 
         acc = u1 / Unit("s")
