@@ -4,6 +4,17 @@
 
 from __future__ import division, unicode_literals
 
+from six.moves import filter, zip
+import numpy as np
+import six
+
+import collections
+from numbers import Number
+import numbers
+from functools import partial
+
+import scipy.constants as const
+
 """
 This module implements a FloatWithUnit, which is a subclass of float. It
 also defines supported units for some commonly used units for energy, length,
@@ -13,8 +24,6 @@ units are detected. An ArrayWithUnit is also implemented, which is a subclass
 of numpy's ndarray with similar unit features.
 """
 
-from six.moves import filter, zip
-
 __author__ = "Shyue Ping Ong, Matteo Giantomassi"
 __copyright__ = "Copyright 2011, The Materials Project"
 __version__ = "1.0"
@@ -22,17 +31,6 @@ __maintainer__ = "Shyue Ping Ong, Matteo Giantomassi"
 __status__ = "Production"
 __date__ = "Aug 30, 2013"
 
-import numpy as np
-import six
-
-import collections
-from numbers import Number
-import numbers
-from functools import partial
-
-import re
-
-import scipy.constants as const
 
 """
 Some conversion factors
@@ -118,6 +116,13 @@ DERIVED_UNITS = {
         "MN": {"kg": 1, "m": 1, "s": -2, 1e6: 1},
         "GN": {"kg": 1, "m": 1, "s": -2, 1e9: 1},
     },
+    "frequency":{
+        "Hz": {"s": -1},
+        "KHz": {"s": -1, 1000: 1},
+        "MHz": {"s": -1, 1e6: 1},
+        "GHz": {"s": -1, 1e9: 1},
+        "THz": {"s": -1, 1e12: 1},
+    },
     "pressure": {
         "Pa": {"kg": 1, "m": -1, "s": -2},
         "KPa": {"kg": 1, "m": -1, "s": -2, 1000: 1},
@@ -202,7 +207,8 @@ class Unit(collections.Mapping):
 
         if isinstance(unit_def, six.string_types):
             unit = collections.defaultdict(int)
-            for m in re.finditer("([A-Za-z]+)\s*\^*\s*([\-0-9]*)", unit_def):
+            import re
+            for m in re.finditer(r"([A-Za-z]+)\s*\^*\s*([\-0-9]*)", unit_def):
                 p = m.group(2)
                 p = 1 if not p else int(p)
                 k = m.group(1)

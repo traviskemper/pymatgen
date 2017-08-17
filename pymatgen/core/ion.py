@@ -19,14 +19,9 @@ __date__ = "Dec 10, 2012"
 import re
 import numpy as np
 
-from composition import Composition
+from pymatgen.core.composition import Composition
 from monty.json import MSONable
-
-# Get util 
-sys.path.append(os.path.abspath(os.path.join('..', 'util')))
-
-
-from string_utils import formula_double_format
+from pymatgen.util.string import formula_double_format
 
 
 class Ion(MSONable):
@@ -59,7 +54,7 @@ class Ion(MSONable):
         f = formula
         m = re.search(r"\[([^\[\]]+)\]", f)
         if m:
-            m_chg = re.search("([\.\d]*)([+-])", m.group(1))
+            m_chg = re.search(r"([\.\d]*)([+-])", m.group(1))
             if m_chg:
                 if m_chg.group(1) != "":
                     charge += float(m_chg.group(1)) * \
@@ -70,7 +65,7 @@ class Ion(MSONable):
         m = re.search(r"\(aq\)", f)
         if m:
             f = f.replace(m.group(), "", 1)
-        for m_chg in re.finditer("([+-])([\.\d]*)", f):
+        for m_chg in re.finditer(r"([+-])([\.\d]*)", f):
             sign = m_chg.group(1)
             sgn = float(str(sign + "1"))
             if m_chg.group(2).strip() != "":

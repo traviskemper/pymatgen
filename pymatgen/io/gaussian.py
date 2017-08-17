@@ -3,7 +3,18 @@
 # Distributed under the terms of the MIT License.
 
 from __future__ import division, unicode_literals
+import re
 
+import numpy as np
+import warnings
+
+from pymatgen.core.operations import SymmOp
+from pymatgen import Element, Molecule, Composition
+from monty.io import zopen
+from pymatgen.util.coord_utils import get_angle
+import scipy.constants as cst
+
+from pymatgen.electronic_structure.core import Spin
 """
 This module implements input and output processing from Gaussian.
 """
@@ -16,16 +27,9 @@ __email__ = 'ongsp@ucsd.edu'
 __date__ = '8/1/15'
 
 
-import re
+float_patt = re.compile(r"\s*([+-]?\d+\.\d+)")
 
-import numpy as np
-import warnings
-
-from pymatgen.core.operations import SymmOp
-from pymatgen.core import Element, Molecule, Composition
-from monty.io import zopen
-from pymatgen.util.coord_utils import get_angle
-import pymatgen.core.physical_constants as cst
+HARTREE_TO_ELECTRON_VOLT = 1/cst.physical_constants["electron volt-hartree relationship"][0]
 
 
 def read_route_line(route):
@@ -39,9 +43,9 @@ def read_route_line(route):
     return
         functional (str) : the method (HF, PBE ...)
         basis_set (str) : the basis set
-        route (dict) : dictionary of parameters 
+        route (dict) : dictionary of parameters
     """
-    scrf_patt = re.compile("^([sS][cC][rR][fF])\s*=\s*(.+)")
+    scrf_patt = re.compile(r"^([sS][cC][rR][fF])\s*=\s*(.+)")
 
     functional = None
     basis_set = None
@@ -60,7 +64,7 @@ def read_route_line(route):
                 m = scrf_patt.match(tok)
                 route_params[m.group(1)] = m.group(2)
             elif "#" in tok:
-                # does not store # in route to avoid error in input 
+                # does not store # in route to avoid error in input
                 dieze_tag = tok
                 continue
             else:
@@ -99,10 +103,10 @@ class GaussianInput(object):
             be set to "Gen".
     """
 
-    #Commonly used regex patterns
-    zmat_patt = re.compile("^(\w+)*([\s,]+(\w+)[\s,]+(\w+))*[\-\.\s,\w]*$")
-    xyz_patt = re.compile("^(\w+)[\s,]+([\d\.eE\-]+)[\s,]+([\d\.eE\-]+)[\s,]+"
-                          "([\d\.eE\-]+)[\-\.\s,\w.]*$")
+    # Commonly used regex patterns
+    zmat_patt = re.compile(r"^(\w+)*([\s,]+(\w+)[\s,]+(\w+))*[\-\.\s,\w]*$")
+    xyz_patt = re.compile(r"^(\w+)[\s,]+([\d\.eE\-]+)[\s,]+([\d\.eE\-]+)[\s,]+"
+                          r"([\d\.eE\-]+)[\-\.\s,\w.]*$")
 
     def __init__(self, mol, charge=None, spin_multiplicity=None, title=None,
                  functional="HF", basis_set="6-31G(d)", route_parameters=None,
@@ -144,7 +148,7 @@ class GaussianInput(object):
         Helper method to parse coordinates.
         """
         paras = {}
-        var_pattern = re.compile("^([A-Za-z]+\S*)[\s=,]+([\d\-\.]+)$")
+        var_pattern = re.compile(r"^([A-Za-z]+\S*)[\s=,]+([\d\-\.]+)$")
         for l in coord_lines:
             m = var_pattern.match(l.strip())
             if m:
@@ -162,14 +166,14 @@ class GaussianInput(object):
             if (not zmode) and GaussianInput.xyz_patt.match(l):
                 m = GaussianInput.xyz_patt.match(l)
                 species.append(m.group(1))
-                toks = re.split("[,\s]+", l.strip())
+                toks = re.split(r"[,\s]+", l.strip())
                 if len(toks) > 4:
                     coords.append([float(i) for i in toks[2:5]])
                 else:
                     coords.append([float(i) for i in toks[1:4]])
             elif GaussianInput.zmat_patt.match(l):
                 zmode = True
-                toks = re.split("[,\s]+", l.strip())
+                toks = re.split(r"[,\s]+", l.strip())
                 species.append(toks[0])
                 toks.pop(0)
                 if len(toks) == 0:
@@ -242,7 +246,7 @@ class GaussianInput(object):
             try:
                 return int(sp_str)
             except ValueError:
-                sp = re.sub("\d", "", sp_str)
+                sp = re.sub(r"\d", "", sp_str)
                 return sp.capitalize()
 
         species = [parse_species(sp) for sp in species]
@@ -262,14 +266,14 @@ class GaussianInput(object):
         """
         lines = [l.strip() for l in contents.split("\n")]
 
-        link0_patt = re.compile("^(%.+)\s*=\s*(.+)")
+        link0_patt = re.compile(r"^(%.+)\s*=\s*(.+)")
         link0_dict = {}
         for i, l in enumerate(lines):
             if link0_patt.match(l):
                 m = link0_patt.match(l)
                 link0_dict[m.group(1)] = m.group(2)
 
-        route_patt = re.compile("^#[sSpPnN]*.*")
+        route_patt = re.compile(r"^#[sSpPnN]*.*")
         route = None
         for i, l in enumerate(lines):
             if route_patt.match(l):
@@ -285,7 +289,7 @@ class GaussianInput(object):
             ind += 1
         title = ' '.join(title)
         ind += 1
-        toks = re.split("[\s,]", lines[route_index + ind])
+        toks = re.split(r"[\s,]", lines[route_index + ind])
         charge = int(toks[0])
         spin_mult = int(toks[1])
         coord_lines = []
@@ -377,8 +381,9 @@ class GaussianInput(object):
         outs = []
         to_s = lambda x: "%0.6f" % x
         for i, site in enumerate(self._mol):
-            outs.append(" ".join([site.species_string, " ".join([to_s(j) for j in site.coords])]))
-        return  "\n".join(outs)
+            outs.append(" ".join([site.species_string,
+                                  " ".join([to_s(j) for j in site.coords])]))
+        return "\n".join(outs)
 
     def __str__(self):
         return self.to_string()
@@ -459,7 +464,6 @@ class GaussianInput(object):
                              link0_parameters=d["link0_parameters"])
 
 
-
 class GaussianOutput(object):
     """
     Parser for Gaussian output files.
@@ -481,13 +485,37 @@ class GaussianOutput(object):
 
         All energies from the calculation.
 
+    .. attribute:: eigenvalues
+
+        List of eigenvalues for the last geometry
+
+    .. attribute:: MO_coefficients
+
+        Matrix of MO coefficients for the last geometry
+
     .. attribute:: cart_forces
 
         All cartesian forces from the calculation.
 
     .. attribute:: frequencies
 
-        The frequencies and normal modes.
+        A list for each freq calculation and for each mode of a dict with
+        {
+            "frequency": freq in cm-1,
+            "symmetry": symmetry tag
+            "r_mass": Reduce mass,
+            "f_constant": force constant,
+            "IR_intensity": IR Intensity,
+            "mode": normal mode
+         }
+
+        The normal mode is a 1D vector of dx, dy dz of each atom.
+
+    .. attribute:: hessian
+
+        Matrix of second derivatives of the energy with respect to cartesian
+        coordinates in the **input orientation** frame. Need #P in the
+        route section in order to be in the output.
 
     .. attribute:: properly_terminated
 
@@ -496,6 +524,10 @@ class GaussianOutput(object):
     .. attribute:: is_pcm
 
         True if run is a PCM run.
+
+    .. attribute:: is_spin
+
+        True if it is an unrestricted run
 
     .. attribute:: stationary_type
 
@@ -525,7 +557,7 @@ class GaussianOutput(object):
         # preceding the route line, e.g. "#P"
 
     .. attribute:: link0
-    
+
         Link0 parameters as a dict. E.g., {"%mem": "1000MW"}
 
     .. attribute:: charge
@@ -540,6 +572,10 @@ class GaussianOutput(object):
 
         Number of basis functions in the run.
 
+    .. attribute:: electrons
+
+        number of alpha and beta electrons as (N alpha, N beta)
+
     .. attribute:: pcm
 
         PCM parameters and output if available.
@@ -552,23 +588,50 @@ class GaussianOutput(object):
 
         Mulliken atomic charges
 
+    .. attribute:: eigenvectors
+
+        Matrix of shape (num_basis_func, num_basis_func). Each column is an
+        eigenvectors and contains AO coefficients of an MO.
+
+        eigenvectors[Spin] = mat(num_basis_func, num_basis_func)
+
+    .. attribute:: molecular_orbital
+
+        MO development coefficients on AO in a more convenient array dict
+        for each atom and basis set label.
+
+        mo[Spin][OM j][atom i] = {AO_k: coeff, AO_k: coeff ... }
+
+    .. attribute:: atom_basis_labels
+
+        Labels of AO for each atoms. These labels are those used in the output
+        of molecular orbital coefficients (POP=Full) and in the molecular_orbital
+        array dict.
+
+        atom_basis_labels[iatom] = [AO_k, AO_k, ...]
+
+    .. attribute:: resumes
+
+        List of gaussian data resume given at the end of the output file before
+        the quotation. The resumes are given as string.
+
     Methods:
-    
+
     .. method:: to_input()
-    
+
         Return a GaussianInput object using the last geometry and the same
         calculation parameters.
-        
+
     .. method:: read_scan()
-    
+
         Read a potential energy surface from a gaussian scan calculation.
 
     .. method:: get_scan_plot()
-    
+
         Get a matplotlib plot of the potential energy surface
-        
+
     .. method:: save_scan_plot()
-    
+
         Save a matplotlib plot of the potential energy surface to a file
 
     """
@@ -586,42 +649,51 @@ class GaussianOutput(object):
         return self.structures[-1]
 
     def _parse(self, filename):
-        start_patt = re.compile(" \(Enter \S+l101\.exe\)")
-        route_patt = re.compile(" #[pPnNtT]*.*")
-        link0_patt = re.compile("^\s(%.+)\s*=\s*(.+)")
-        charge_mul_patt = re.compile("Charge\s+=\s*([-\\d]+)\s+"
-                                     "Multiplicity\s+=\s*(\d+)")
-        num_basis_func_patt = re.compile("([0-9]+)\s+basis functions")
-        pcm_patt = re.compile("Polarizable Continuum Model")
-        stat_type_patt = re.compile("imaginary frequencies")
-        scf_patt = re.compile("E\(.*\)\s*=\s*([-\.\d]+)\s+")
-        mp2_patt = re.compile("EUMP2\s*=\s*(.*)")
-        oniom_patt = re.compile("ONIOM:\s+extrapolated energy\s*=\s*(.*)")
-        termination_patt = re.compile("(Normal|Error) termination")
+        start_patt = re.compile(r" \(Enter \S+l101\.exe\)")
+        route_patt = re.compile(r" #[pPnNtT]*.*")
+        link0_patt = re.compile(r"^\s(%.+)\s*=\s*(.+)")
+        charge_mul_patt = re.compile(r"Charge\s+=\s*([-\d]+)\s+"
+                                     r"Multiplicity\s+=\s*(\d+)")
+        num_basis_func_patt = re.compile(r"([0-9]+)\s+basis functions")
+        num_elec_patt = re.compile(r"(\d+)\s+alpha electrons\s+(\d+)\s+beta electrons")
+        pcm_patt = re.compile(r"Polarizable Continuum Model")
+        stat_type_patt = re.compile(r"imaginary frequencies")
+        scf_patt = re.compile(r"E\(.*\)\s*=\s*([-\.\d]+)\s+")
+        mp2_patt = re.compile(r"EUMP2\s*=\s*(.*)")
+        oniom_patt = re.compile(r"ONIOM:\s+extrapolated energy\s*=\s*(.*)")
+        termination_patt = re.compile(r"(Normal|Error) termination")
         error_patt = re.compile(
-            "(! Non-Optimized Parameters !|Convergence failure)")
+            r"(! Non-Optimized Parameters !|Convergence failure)")
         mulliken_patt = re.compile(
-            "^\s*(Mulliken charges|Mulliken atomic charges)")
+            r"^\s*(Mulliken charges|Mulliken atomic charges)")
         mulliken_charge_patt = re.compile(
-            '^\s+(\d+)\s+([A-Z][a-z]?)\s*(\S*)')
+            r'^\s+(\d+)\s+([A-Z][a-z]?)\s*(\S*)')
         end_mulliken_patt = re.compile(
-            '(Sum of Mulliken )(.*)(charges)\s*=\s*(\D)')
-        std_orientation_patt = re.compile("Standard orientation")
-        end_patt = re.compile("--+")
-        orbital_patt = re.compile("Alpha\s*\S+\s*eigenvalues --(.*)")
-        thermo_patt = re.compile("(Zero-point|Thermal) correction(.*)="
-                                 "\s+([\d\.-]+)")
+            r'(Sum of Mulliken )(.*)(charges)\s*=\s*(\D)')
+        std_orientation_patt = re.compile(r"Standard orientation")
+        end_patt = re.compile(r"--+")
+        orbital_patt = re.compile(r"(Alpha|Beta)\s*\S+\s*eigenvalues --(.*)")
+        thermo_patt = re.compile(r"(Zero-point|Thermal) correction(.*)="
+                                 r"\s+([\d\.-]+)")
         forces_on_patt = re.compile(
-            "Center\s+Atomic\s+Forces\s+\(Hartrees/Bohr\)")
-        forces_off_patt = re.compile("Cartesian\s+Forces:\s+Max.*RMS.*")
+            r"Center\s+Atomic\s+Forces\s+\(Hartrees/Bohr\)")
+        forces_off_patt = re.compile(r"Cartesian\s+Forces:\s+Max.*RMS.*")
         forces_patt = re.compile(
-            "\s+(\d+)\s+(\d+)\s+([0-9\.-]+)\s+([0-9\.-]+)\s+([0-9\.-]+)")
+            r"\s+(\d+)\s+(\d+)\s+([0-9\.-]+)\s+([0-9\.-]+)\s+([0-9\.-]+)")
 
         freq_on_patt = re.compile(
-            "Harmonic\sfrequencies\s+\(cm\*\*-1\),\sIR\sintensities.*Raman.*")
-        freq_patt = re.compile("Frequencies\s--\s+(.*)")
+            r"Harmonic\sfrequencies\s+\(cm\*\*-1\),\sIR\sintensities.*Raman.*")
+        freq_patt = re.compile(r"Frequencies\s--\s+(.*)")
+
         normal_mode_patt = re.compile(
-            "\s+(\d+)\s+(\d+)\s+([0-9\.-]{4,5})\s+([0-9\.-]{4,5}).*")
+            r"\s+(\d+)\s+(\d+)\s+([0-9\.-]{4,5})\s+([0-9\.-]{4,5}).*")
+
+        mo_coeff_patt = re.compile(r"Molecular Orbital Coefficients:")
+        mo_coeff_name_patt = re.compile(r"\d+\s((\d+|\s+)\s+([a-zA-Z]{1,2}|\s+))\s+(\d+\S+)")
+
+        hessian_patt = re.compile(r"Force constants in Cartesian coordinates:")
+        resume_patt = re.compile(r"^\s1\\1\\GINC-\S*")
+        resume_end_patt = re.compile(r"^\s.*\\\\@")
 
         self.properly_terminated = False
         self.is_pcm = False
@@ -635,11 +707,16 @@ class GaussianOutput(object):
         self.link0 = {}
         self.cart_forces = []
         self.frequencies = []
+        self.eigenvalues = []
+        self.is_spin = False
+        self.hessian = None
+        self.resumes = []
 
         coord_txt = []
         read_coord = 0
         read_mulliken = False
-        orbitals_txt = []
+        read_eigen = False
+        eigen_txt = []
         parse_stage = 0
         num_basis_found = False
         terminated = False
@@ -647,6 +724,8 @@ class GaussianOutput(object):
         forces = []
         parse_freq = False
         frequencies = []
+        read_mo = False
+        parse_hessian = False
 
         with zopen(filename) as f:
             for line in f:
@@ -661,6 +740,7 @@ class GaussianOutput(object):
                         self.functional = params[0]
                         self.basis_set = params[1]
                         self.route = params[2]
+                        route_lower = {k.lower(): v for k, v in self.route.items()}
                         self.dieze_tag = params[3]
                         parse_stage = 1
                 elif parse_stage == 1:
@@ -674,7 +754,7 @@ class GaussianOutput(object):
                     if self.is_pcm:
                         self._check_pcm(line)
 
-                    if "FREQ" in self.route and thermo_patt.search(line):
+                    if "freq" in route_lower and thermo_patt.search(line):
                         m = thermo_patt.search(line)
                         if m.group(1) == "Zero-point":
                             self.corrections["Zero-point"] = float(m.group(3))
@@ -705,22 +785,153 @@ class GaussianOutput(object):
                             forces = []
                             parse_forces = False
 
-                    elif parse_freq:
-                        m = freq_patt.search(line)
+                    # read molecular orbital eigenvalues
+                    if read_eigen:
+                        m = orbital_patt.search(line)
                         if m:
-                            values = [float(_v) for _v in m.groups()[0].split()]
-                            for value in values:
-                                frequencies.append([value, []])
-                        elif normal_mode_patt.search(line):
-                            values = [float(_v) for _v in line.split()[2:]]
-                            n = int(len(values) / 3)
-                            for i in range(0, len(values), 3):
-                                j = -n + int(i / 3)
-                                frequencies[j][1].extend(values[i:i+3])
-                        elif line.find("-------------------") != -1:
-                            parse_freq = False
-                            self.frequencies.append(frequencies)
-                            frequencies = []
+                            eigen_txt.append(line)
+                        else:
+                            read_eigen = False
+                            self.eigenvalues = {Spin.up: []}
+                            for eigenline in eigen_txt:
+                                if "Alpha" in eigenline:
+                                    self.eigenvalues[Spin.up] += [float(e)
+                                        for e in float_patt.findall(eigenline)]
+                                elif "Beta" in eigenline:
+                                    if Spin.down not in self.eigenvalues:
+                                        self.eigenvalues[Spin.down] = []
+                                    self.eigenvalues[Spin.down] += [float(e)
+                                        for e in float_patt.findall(eigenline)]
+                            eigen_txt = []
+
+                    # read molecular orbital coefficients
+                    if read_mo:
+                        # build a matrix with all coefficients
+                        all_spin = [Spin.up]
+                        if self.is_spin:
+                            all_spin.append(Spin.down)
+
+                        mat_mo = {}
+                        for spin in all_spin:
+                            mat_mo[spin] = np.zeros((self.num_basis_func, self.num_basis_func))
+                            nMO = 0
+                            end_mo = False
+                            while nMO < self.num_basis_func and not end_mo:
+                                f.readline()
+                                f.readline()
+                                self.atom_basis_labels = []
+                                for i in range(self.num_basis_func):
+                                    line = f.readline()
+
+                                    # identify atom and OA labels
+                                    m = mo_coeff_name_patt.search(line)
+                                    if m.group(1).strip() != "":
+                                        iat = int(m.group(2)) - 1
+                                        # atname = m.group(3)
+                                        self.atom_basis_labels.append([m.group(4)])
+                                    else:
+                                        self.atom_basis_labels[iat].append(m.group(4))
+
+                                    # MO coefficients
+                                    coeffs = [float(c) for c in float_patt.findall(line)]
+                                    for j in range(len(coeffs)):
+                                        mat_mo[spin][i, nMO + j] = coeffs[j]
+
+                                nMO += len(coeffs)
+                                line = f.readline()
+                                # manage pop=regular case (not all MO)
+                                if nMO < self.num_basis_func and \
+                                    ("Density Matrix:" in line or mo_coeff_patt.search(line)):
+                                    end_mo = True
+                                    warnings.warn("POP=regular case, matrix coefficients not complete")
+                            f.readline()
+
+                        self.eigenvectors = mat_mo
+                        read_mo = False
+
+                        # build a more convenient array dict with MO coefficient of
+                        # each atom in each MO.
+                        # mo[Spin][OM j][atom i] = {AO_k: coeff, AO_k: coeff ... }
+                        mo = {}
+                        for spin in all_spin:
+                            mo[spin] = [[{} for iat in range(len(self.atom_basis_labels))]
+                                                for j in range(self.num_basis_func)]
+                            for j in range(self.num_basis_func):
+                                i = 0
+                                for iat in range(len(self.atom_basis_labels)):
+                                    for label in self.atom_basis_labels[iat]:
+                                        mo[spin][j][iat][label] = self.eigenvectors[spin][i, j]
+                                        i += 1
+
+                        self.molecular_orbital = mo
+
+                    elif parse_freq:
+                        while line.strip() != "": # blank line
+                            ifreqs = [int(val) - 1 for val in line.split()]
+                            for ifreq in ifreqs:
+                                frequencies.append({"frequency": None,
+                                                    "r_mass": None,
+                                                    "f_constant": None,
+                                                    "IR_intensity": None,
+                                                    "symmetry": None,
+                                                    "mode": []})
+                            # read freq, intensity, masses, symmetry ...
+                            while "Atom  AN" not in line:
+                                if "Frequencies --" in line:
+                                    freqs = map(float, float_patt.findall(line))
+                                    for ifreq, freq in zip(ifreqs, freqs):
+                                        frequencies[ifreq]["frequency"] = freq
+                                elif "Red. masses --" in line:
+                                    r_masses = map(float, float_patt.findall(line))
+                                    for ifreq, r_mass in zip(ifreqs, r_masses):
+                                        frequencies[ifreq]["r_mass"] = r_mass
+                                elif "Frc consts  --" in line:
+                                    f_consts = map(float, float_patt.findall(line))
+                                    for ifreq, f_const in zip(ifreqs, f_consts):
+                                        frequencies[ifreq]["f_constant"] = f_const
+                                elif "IR Inten    --" in line:
+                                    IR_intens = map(float, float_patt.findall(line))
+                                    for ifreq, intens in zip(ifreqs, IR_intens):
+                                        frequencies[ifreq]["IR_intensity"] = intens
+                                else:
+                                    syms = line.split()[:3]
+                                    for ifreq, sym in zip(ifreqs, syms):
+                                        frequencies[ifreq]["symmetry"] = sym
+                                line = f.readline()
+
+                            # read normal modes
+                            line = f.readline()
+                            while normal_mode_patt.search(line):
+                                values = list(map(float, float_patt.findall(line)))
+                                for i, ifreq in zip(range(0, len(values), 3), ifreqs):
+                                    frequencies[ifreq]["mode"].extend(values[i:i+3])
+                                line = f.readline()
+
+                        parse_freq = False
+                        self.frequencies.append(frequencies)
+                        frequencies = []
+
+                    elif parse_hessian:
+                        # read Hessian matrix under "Force constants in Cartesian coordinates"
+                        # Hessian matrix is in the input orientation framework
+                        # WARNING : need #P in the route line
+                        parse_hessian = False
+                        ndf = 3 * len(self.structures[0])
+                        self.hessian = np.zeros((ndf, ndf))
+                        j_indices = range(5)
+                        jndf = 0
+                        while jndf < ndf:
+                            for i in range(jndf, ndf):
+                                line = f.readline()
+                                vals = re.findall(r"\s*([+-]?\d+\.\d+[eEdD]?[+-]\d+)", line)
+                                vals = [float(val.replace("D", "E")) for val in vals]
+                                for jval, val in enumerate(vals):
+                                    j = j_indices[jval]
+                                    self.hessian[i, j] = val
+                                    self.hessian[j, i] = val
+                            jndf += len(vals)
+                            line = f.readline()
+                            j_indices = [j + 5 for j in j_indices]
 
                     elif termination_patt.search(line):
                         m = termination_patt.search(line)
@@ -740,10 +951,13 @@ class GaussianOutput(object):
                         m = num_basis_func_patt.search(line)
                         self.num_basis_func = int(m.group(1))
                         num_basis_found = True
+                    elif num_elec_patt.search(line):
+                        m = num_elec_patt.search(line)
+                        self.electrons = (int(m.group(1)), int(m.group(2)))
                     elif (not self.is_pcm) and pcm_patt.search(line):
                         self.is_pcm = True
                         self.pcm = {}
-                    elif "FREQ" in self.route and "OPT" in self.route and \
+                    elif "freq" in route_lower and "opt" in route_lower and \
                             stat_type_patt.search(line):
                         self.stationary_type = "Saddle"
                     elif mp2_patt.search(line):
@@ -759,8 +973,9 @@ class GaussianOutput(object):
                     elif std_orientation_patt.search(line):
                         coord_txt = []
                         read_coord = 1
-                    elif orbital_patt.search(line):
-                        orbitals_txt.append(line)
+                    elif not read_eigen and orbital_patt.search(line):
+                        eigen_txt.append(line)
+                        read_eigen = True
                     elif mulliken_patt.search(line):
                         mulliken_txt = []
                         read_mulliken = True
@@ -768,6 +983,23 @@ class GaussianOutput(object):
                         parse_forces = True
                     elif freq_on_patt.search(line):
                         parse_freq = True
+                        [f.readline() for i in range(3)]
+                    elif mo_coeff_patt.search(line):
+                        if "Alpha" in line:
+                            self.is_spin = True
+                        read_mo = True
+                    elif hessian_patt.search(line):
+                        parse_hessian = True
+                    elif resume_patt.search(line):
+                        resume = []
+                        while not resume_end_patt.search(line):
+                            resume.append(line)
+                            line = f.readline()
+                            if line == "\n": # security if \\@ not in one line !
+                                break
+                        resume.append(line)
+                        resume = "".join([r.strip() for r in resume])
+                        self.resumes.append(resume)
 
                     if read_mulliken:
                         if not end_mulliken_patt.search(line):
@@ -783,18 +1015,19 @@ class GaussianOutput(object):
                             read_mulliken = False
                             self.Mulliken_charges = mulliken_charges
 
+
         if not terminated:
             #raise IOError("Bad Gaussian output file.")
             warnings.warn("\n" + self.filename + \
                 ": Termination error or bad Gaussian output file !")
 
     def _check_pcm(self, line):
-        energy_patt = re.compile("(Dispersion|Cavitation|Repulsion) energy"
-                                 "\s+\S+\s+=\s+(\S*)")
-        total_patt = re.compile("with all non electrostatic terms\s+\S+\s+"
-                                "=\s+(\S*)")
-        parameter_patt = re.compile("(Eps|Numeral density|RSolv|Eps"
-                                    "\(inf[inity]*\))\s+=\s*(\S*)")
+        energy_patt = re.compile(r"(Dispersion|Cavitation|Repulsion) energy"
+                                 r"\s+\S+\s+=\s+(\S*)")
+        total_patt = re.compile(r"with all non electrostatic terms\s+\S+\s+"
+                                r"=\s+(\S*)")
+        parameter_patt = re.compile(r"(Eps|Numeral density|RSolv|Eps"
+                                    r"\(inf[inity]*\))\s+=\s*(\S*)")
 
         if energy_patt.search(line):
             m = energy_patt.search(line)
@@ -852,17 +1085,17 @@ class GaussianOutput(object):
         return d
 
     def read_scan(self):
-        """  
+        """
         Read a potential energy surface from a gaussian scan calculation.
-        
+
         Returns:
-        
-            A dict: {"energies": [ values ], 
+
+            A dict: {"energies": [ values ],
                      "coords": {"d1": [ values ], "A2", [ values ], ... }}
-            
+
             "energies" are the energies of all points of the potential energy
-            surface. "coords" are the internal coordinates used to compute the 
-            potential energy surface and the internal coordinates optimized, 
+            surface. "coords" are the internal coordinates used to compute the
+            potential energy surface and the internal coordinates optimized,
             labelled by their name as defined in the calculation.
         """
 
@@ -870,9 +1103,8 @@ class GaussianOutput(object):
             """ return a list of float from a list of string """
             return [float(v) for v in l]
 
-        scan_patt = re.compile("^\sSummary of the potential surface scan:")
-        optscan_patt = re.compile("^\sSummary of Optimized Potential Surface Scan")
-        float_patt = re.compile("\s*([+-]?\d+\.\d+)")
+        scan_patt = re.compile(r"^\sSummary of the potential surface scan:")
+        optscan_patt = re.compile(r"^\sSummary of Optimized Potential Surface Scan")
 
         # data dict return
         data = {"energies": list(), "coords": dict()}
@@ -889,14 +1121,14 @@ class GaussianOutput(object):
                     while not endScan:
                         data["energies"] += floatList(float_patt.findall(line))
                         line = f.readline()
-                        while not re.search("(^\s+(\d+)|^\s-+)", line):
+                        while not re.search(r"(^\s+(\d+)|^\s-+)", line):
                             icname = line.split()[0].strip()
                             if icname in data["coords"]:
                                 data["coords"][icname] += floatList(float_patt.findall(line))
                             else:
                                 data["coords"][icname] = floatList(float_patt.findall(line))
                             line = f.readline()
-                        if re.search("^\s-+", line):
+                        if re.search(r"^\s-+", line):
                             endScan = True
                         else:
                             line = f.readline()
@@ -906,12 +1138,12 @@ class GaussianOutput(object):
                     data["coords"] = {icname: list() for icname in line.split()[1:-1]}
                     f.readline()
                     line = f.readline()
-                    while not re.search("^\s-+", line):
+                    while not re.search(r"^\s-+", line):
                         values = floatList(line.split())
                         data["energies"].append(values[-1])
                         for i, icname in enumerate(data["coords"]):
                             data["coords"][icname].append(values[i+1])
-                        line = f.readline()    
+                        line = f.readline()
                 else:
                     line = f.readline()
 
@@ -924,9 +1156,9 @@ class GaussianOutput(object):
         Args:
             coords: internal coordinate name to use as abcissa.
         """
-        from pymatgen.util.plotting_utils import get_publication_quality_plot
+        from pymatgen.util.plotting import pretty_plot
 
-        plt = get_publication_quality_plot(12, 8)
+        plt = pretty_plot(12, 8)
 
         d = self.read_scan()
 
@@ -936,15 +1168,15 @@ class GaussianOutput(object):
         else:
             x = range(len(d["energies"]))
             plt.xlabel("points")
-        
-        plt.ylabel("Energy   /   eV")
-        
+
+        plt.ylabel("Energy (eV)")
+
         e_min = min(d["energies"])
-        y = [(e - e_min) * cst.HARTREE_TO_ELECTRON_VOLT for e in d["energies"]]
-        
+        y = [(e - e_min) * HARTREE_TO_ELECTRON_VOLT for e in d["energies"]]
+
         plt.plot(x, y, "ro--")
         return plt
-        
+
     def save_scan_plot(self, filename="scan.pdf", img_format="pdf", coords=None):
         """
         Save matplotlib plot of the potential energy surface to a file.
@@ -963,10 +1195,9 @@ class GaussianOutput(object):
 
         Returns:
 
-            A list: A list of tuple for each transition such as 
+            A list: A list of tuple for each transition such as
                     [(energie (eV), lambda (nm), oscillatory strength), ... ]
         """
-        float_patt = re.compile("\s*([+-]?\d+\.\d+)")
 
         transitions = list()
 
@@ -975,11 +1206,11 @@ class GaussianOutput(object):
             line = f.readline()
             td = False
             while line != "":
-                if re.search("^\sExcitation energies and oscillator strengths:", line):
+                if re.search(r"^\sExcitation energies and oscillator strengths:", line):
                     td = True
-   
+
                 if td:
-                    if re.search("^\sExcited State\s*\d", line):
+                    if re.search(r"^\sExcited State\s*\d", line):
                         val = [float(v) for v in float_patt.findall(line)]
                         transitions.append(tuple(val[0:3]))
                 line = f.readline()
@@ -995,16 +1226,16 @@ class GaussianOutput(object):
         Args:
             sigma: Full width at half maximum in eV for normal functions.
             step: bin interval in eV
-            
+
         Returns:
             A dict: {"energies": values, "lambda": values, "spectra": values}
                     where values are lists of abscissa (energies, lamba) and
                     the sum of gaussian functions (spectra).
             A matplotlib plot.
         """
-        from pymatgen.util.plotting_utils import get_publication_quality_plot
+        from pymatgen.util.plotting import pretty_plot
         from matplotlib.mlab import normpdf
-        plt = get_publication_quality_plot(12, 8)
+        plt = pretty_plot(12, 8)
 
         transitions = self.read_excitation_energies()
 
@@ -1015,13 +1246,13 @@ class GaussianOutput(object):
         eneval = np.linspace(minval, maxval, npts) # in eV
         lambdaval = [cst.h * cst.c / (val * cst.e) * 1.e9 for val in eneval] # in nm
 
-        # sum of gaussian functions        
+        # sum of gaussian functions
         spectre = np.zeros(npts)
         for trans in transitions:
             spectre += trans[2] * normpdf(eneval, trans[0], sigma)
         spectre /= spectre.max()
         plt.plot(lambdaval, spectre, "r-", label="spectre")
-        
+
         data = {"energies": eneval, "lambda": lambdaval, "spectra": spectre}
 
         # plot transitions as vlines
@@ -1032,13 +1263,13 @@ class GaussianOutput(object):
                    label="transitions",
                    linewidth=2)
 
-        plt.xlabel("$\lambda$ (nm)")
+        plt.xlabel("$\\lambda$ (nm)")
         plt.ylabel("Arbitrary unit")
         plt.legend()
 
         return data, plt
 
-    def save_spectre_plot(self, filename="spectre.pdf", img_format="pdf", 
+    def save_spectre_plot(self, filename="spectre.pdf", img_format="pdf",
                           sigma=0.05, step=0.01):
         """
         Save matplotlib plot of the spectre to a file.
@@ -1047,7 +1278,7 @@ class GaussianOutput(object):
             filename: Filename to write to.
             img_format: Image format to use. Defaults to EPS.
             sigma: Full width at half maximum in eV for normal functions.
-            step: bin interval in eV            
+            step: bin interval in eV
         """
         d, plt = self.get_spectre_plot(sigma, step)
         plt.savefig(filename, format=img_format)
@@ -1105,4 +1336,3 @@ class GaussianOutput(object):
         gauinp.write_file(filename, cart_coords=cart_coords)
 
         return gauinp
-

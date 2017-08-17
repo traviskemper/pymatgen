@@ -4,6 +4,26 @@
 
 from __future__ import division, unicode_literals
 
+import collections
+import numbers
+import string
+from itertools import combinations_with_replacement, product
+
+import six
+import re
+
+from collections import defaultdict
+from six.moves import filter, map, zip
+
+from functools import total_ordering
+
+from monty.fractions import gcd, gcd_float
+from pymatgen.core.periodic_table import get_el_sp, Element
+from pymatgen.util.string import formula_double_format
+from monty.json import MSONable
+from pymatgen.core.units import unitized
+
+
 """
 This module implements a Composition class to represent compositions,
 and a ChemicalPotential class to represent potentials.
@@ -16,27 +36,6 @@ __maintainer__ = "Shyue Ping Ong"
 __email__ = "shyuep@gmail.com"
 __status__ = "Production"
 __date__ = "Nov 10, 2012"
-
-import collections
-import numbers
-import re
-import string
-
-import six
-from six.moves import filter, map, zip
-
-from fractions import Fraction
-from functools import total_ordering
-
-from monty.fractions import gcd, lcm
-from periodic_table import get_el_sp, Element
-# Get util 
-sys.path.append(os.path.abspath(os.path.join('..', 'util')))
-
-from string_utils import formula_double_format
-from monty.json import MSONable
-
-from units import unitized
 
 
 @total_ordering
@@ -116,7 +115,7 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
             string as an input formula. E.g., Composition("Li2O").
 
             allow_negative: Whether to allow negative compositions. This
-                argument must be popped from the \*\*kwargs due to \*args
+                argument must be popped from the \\*\\*kwargs due to \\*args
                 ambiguity.
         """
         self.allow_negative = kwargs.pop('allow_negative', False)
@@ -144,7 +143,9 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
             sp = get_el_sp(item)
             return self._data.get(sp, 0)
         except ValueError as ex:
-            raise TypeError("Invalid key type for Composition")
+            raise TypeError("Invalid key {}, {} for Composition\n"
+                            "ValueError exception:\n{}".format(item,
+                                                               type(item), ex))
 
     def __len__(self):
         return len(self._data)
@@ -156,8 +157,10 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
         try:
             sp = get_el_sp(item)
             return sp in self._data
-        except ValueError:
-            raise TypeError("Invalid key type for Composition")
+        except ValueError as ex:
+            raise TypeError("Invalid key {}, {} for Composition\n"
+                            "ValueError exception:\n{}".format(item,
+                                                               type(item), ex))
 
     def __eq__(self, other):
         #  elements with amounts < Composition.amount_tolerance don't show up
@@ -346,10 +349,11 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
             A pretty normalized formula and a multiplicative factor, i.e.,
             Li4Fe4P4O16 returns (LiFePO4, 4).
         """
-        all_int = all(x == int(x) for x in self.values())
+        all_int = all(abs(x - round(x)) < Composition.amount_tolerance
+                      for x in self.values())
         if not all_int:
             return self.formula.replace(" ", ""), 1
-        d = self.get_el_amt_dict()
+        d = {k: int(round(v)) for k, v in self.get_el_amt_dict().items()}
         (formula, factor) = reduce_formula(d)
 
         if formula in Composition.special_formulas:
@@ -370,17 +374,15 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
             A pretty normalized formula and a multiplicative factor, i.e.,
             Li0.5O0.25 returns (Li2O, 0.25). O0.25 returns (O2, 0.125)
         """
-        vals = [Fraction(v).limit_denominator(max_denominator)
-                for v in self.values()]
-        denom = lcm(*(f.denominator for f in vals))
+        el_amt = self.get_el_amt_dict()
+        g = gcd_float(list(el_amt.values()), 1 / max_denominator)
 
-        mul = gcd(*[int(v * denom) for v in vals])
-        d = {k: round(v / mul * denom) for k, v in self.get_el_amt_dict().items()}
+        d = {k: round(v / g) for k, v in el_amt.items()}
         (formula, factor) = reduce_formula(d)
         if formula in Composition.special_formulas:
             formula = Composition.special_formulas[formula]
             factor /= 2
-        return formula, factor * mul / denom
+        return formula, factor * g
 
     @property
     def reduced_formula(self):
@@ -389,6 +391,17 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
         Li4Fe4P4O16.
         """
         return self.get_reduced_formula_and_factor()[0]
+
+    @property
+    def hill_formula(self):
+        c = self.element_composition
+        elements = sorted([el.symbol for el in c.keys()])
+        if "C" in elements:
+            elements = ["C"] + [el for el in elements if el != "C"]
+
+        formula = ["%s%s" % (el, formula_double_format(c[el]) if c[el] != 1 else "")
+                   for el in elements]
+        return " ".join(formula)
 
     @property
     def elements(self):
@@ -453,7 +466,7 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
         """
         def get_sym_dict(f, factor):
             sym_dict = collections.defaultdict(float)
-            for m in re.finditer(r"([A-Z][a-z]*)([-*\.\d]*)", f):
+            for m in re.finditer(r"([A-Z][a-z]*)\s*([-*\.\d]*)", f):
                 el = m.group(1)
                 amt = 1
                 if m.group(2).strip() != "":
@@ -464,7 +477,7 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
                 raise CompositionError("{} is an invalid formula!".format(f))
             return sym_dict
 
-        m = re.search(r"\(([^\(\)]+)\)([\.\d]*)", formula)
+        m = re.search(r"\(([^\(\)]+)\)\s*([\.\d]*)", formula)
         if m:
             factor = 1
             if m.group(2) != "":
@@ -561,6 +574,75 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
                 "reduced_cell_formula": self.reduced_formula,
                 "elements": self.as_dict().keys(),
                 "nelements": len(self.as_dict().keys())}
+
+    def oxi_state_guesses(self, oxi_states_override=None, target_charge=0,
+                          all_oxi_states=False):
+        """
+        Checks if the composition is charge-balanced and returns back all
+        charge-balanced oxidation state combinations. Composition must have
+        integer values. Note that more num_atoms in the composition gives
+        more degrees of freedom. e.g., if possible oxidation states of
+        element X are [2,4] and Y are [-3], then XY is not charge balanced
+        but X2Y2 is.
+
+        Args:
+            oxi_states_override (dict): dict of str->list to override an
+                element's common oxidation states, e.g. {"V": [2,3,4,5]}
+            target_charge (int): the desired total charge on the structure.
+                Default is 0 signifying charge balance.
+            all_oxi_states (bool): if True, an element defaults to
+                all oxidation states in pymatgen Element.oxidation_states.
+                Otherwise, default is Element.common_oxidation_states. Note
+                that the full oxidation state list is *very* inclusive and
+                can produce nonsensical results.
+
+        Returns:
+            A list of dicts - each dict reports an element symbol and average
+                oxidation state across all sites in that composition. If the
+                composition is not charge balanced, an empty list is returned.
+        """
+
+        oxi_states_override = oxi_states_override or {}
+
+        # assert: Composition only has integer amounts
+        if not all(amt == int(amt) for amt in self.values()):
+            raise ValueError("Charge balance analysis requires integer "
+                             "values in Composition!")
+
+        # for each element, determine all possible sum of oxidations
+        # (taking into account nsites for that particular element)
+        el_amt = self.get_el_amt_dict()
+        el_sums = defaultdict(set)  # dict of element to possible oxid sums
+        for el in el_amt:
+            if oxi_states_override.get(el):
+                oxids = oxi_states_override[el]
+            elif all_oxi_states:
+                oxids = Element(el).oxidation_states
+            else:
+                oxids = Element(el).common_oxidation_states
+
+            # get all possible combinations of oxidation states
+            # and sum each combination
+            for oxid_combo in combinations_with_replacement(oxids,
+                                                            int(el_amt[el])):
+                el_sums[el].add(sum(oxid_combo))
+
+        els = el_sums.keys()
+        sums = el_sums.values()
+        all_sols = []  # will contain all solutions
+        for x in product(*sums):
+            # each x is a trial of one possible oxidation sum for each element
+            if sum(x) == target_charge:  # charge balance condition
+                el_sum_sol = dict(zip(els, x))  # element->oxid_sum
+                # normalize oxid_sum by amount to get avg oxid state
+                sol = {el: v / el_amt[el] for el, v in el_sum_sol.items()}
+                all_sols.append(sol)  # add the solution to the list of solutions
+
+        # present results with smaller sum-square charge magnitudes first
+        # note: one could use tabulated oxidation state potentials for a
+        # more accurate ranking (exercise for the reader)
+        all_sols.sort(key=lambda x: sum([v**2 for v in x.values()]))
+        return all_sols
 
     @staticmethod
     def ranked_compositions_from_indeterminate_formula(fuzzy_formula,
@@ -689,20 +771,20 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
         fuzzy_formula = fuzzy_formula.strip()
 
         if len(fuzzy_formula) == 0:
-            #The entire formula has been parsed into m_dict. Return the
-            #corresponding Composition and number of points
+            # The entire formula has been parsed into m_dict. Return the
+            # corresponding Composition and number of points
             if m_dict:
                 yield (Composition.from_dict(m_dict), m_points)
         else:
-            #if there is a parenthesis, remove it and match the remaining stuff
-            #with the appropriate factor
+            # if there is a parenthesis, remove it and match the remaining stuff
+            # with the appropriate factor
             for mp in re.finditer(r"\(([^\(\)]+)\)([\.\d]*)", fuzzy_formula):
                 mp_points = m_points
                 mp_form = fuzzy_formula.replace(mp.group(), " ", 1)
                 mp_dict = dict(m_dict)
                 mp_factor = 1 if mp.group(2) == "" else float(mp.group(2))
-                #Match the stuff inside the parenthesis with the appropriate
-                #factor
+                # Match the stuff inside the parenthesis with the appropriate
+                # factor
                 for match in \
                     Composition._comps_from_fuzzy_formula(mp.group(1),
                                                           mp_dict,
@@ -719,13 +801,13 @@ class Composition(collections.Hashable, collections.Mapping, MSONable):
                                                               factor=1):
                         only_me = False
                         yield (match[0] + match2[0], match[1] + match2[1])
-                    #if the stuff inside the parenthesis is nothing, then just
-                    #return the stuff inside the parentheses
+                    # if the stuff inside the parenthesis is nothing, then just
+                    # return the stuff inside the parentheses
                     if only_me:
                         yield match
                 return
 
-            #try to match the single-letter elements
+            # try to match the single-letter elements
             m1 = re.match(r"([A-z])([\.\d]*)", fuzzy_formula)
             if m1:
                 m_points1 = m_points
@@ -770,7 +852,7 @@ def reduce_formula(sym_amt):
         (reduced_formula, factor).
     """
     syms = sorted(sym_amt.keys(),
-                  key=lambda s: get_el_sp(s).X)
+                  key=lambda s: [get_el_sp(s).X, s])
 
     syms = list(filter(lambda s: abs(sym_amt[s]) >
                        Composition.amount_tolerance, syms))

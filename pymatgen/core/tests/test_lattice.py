@@ -4,7 +4,9 @@
 
 from __future__ import division, unicode_literals
 
+import sys, os
 import itertools
+
 from pymatgen.core.lattice import Lattice
 import numpy as np
 from pymatgen.util.testing import PymatgenTest

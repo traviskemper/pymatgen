@@ -4,20 +4,17 @@
 
 from __future__ import division, unicode_literals, print_function
 
-import os, json, re, sys
+import os
+import re
+import json
+import warnings
 from io import open
 from enum import Enum
 
-from units import Mass, Length, unitized, FloatWithUnit, Unit, \
+from pymatgen.core.units import Mass, Length, unitized, FloatWithUnit, Unit, \
     SUPPORTED_UNIT_NAMES
-
-# Get util 
-sys.path.append(os.path.abspath(os.path.join('..', 'util')))
-
-from string_utils import formula_double_format
-
+from pymatgen.util.string import formula_double_format
 from monty.json import MSONable
-from monty.dev import deprecated
 
 """
 Module contains classes presenting Element and Specie (Element + oxidation
@@ -35,8 +32,8 @@ __date__ = "Sep 23, 2011"
 
 
 # Loads element data from json file
-with open(os.path.join(os.path.dirname(__file__), "periodic_table.json"), "rt"
-          ) as f:
+with open(os.path.join(os.path.dirname(__file__),
+                       "periodic_table.json"), "rt") as f:
     _pt_data = json.load(f)
 
 _pt_row_sizes = (2, 8, 8, 18, 18, 32, 32)
@@ -381,38 +378,61 @@ class Element(Enum):
 
         # Store key variables for quick access
         self.Z = d["Atomic no"]
-        self.X = d.get("X", 0)
-        for a in ["mendeleev_no", "electrical_resistivity",
-                  "velocity_of_sound", "reflectivity",
-                  "refractive_index", "poissons_ratio", "molar_volume",
-                  "electronic_structure", "thermal_conductivity",
-                  "boiling_point", "melting_point",
-                  "critical_temperature", "superconduction_temperature",
-                  "liquid_range", "bulk_modulus", "youngs_modulus",
-                  "brinell_hardness", "rigidity_modulus",
-                  "mineral_hardness", "vickers_hardness",
-                  "density_of_solid", "atomic_radius_calculated",
-                  "van_der_waals_radius",
-                  "coefficient_of_linear_thermal_expansion"]:
-            kstr = a.capitalize().replace("_", " ")
-            val = d.get(kstr, None)
+
+        at_r = d.get("Atomic radius", "no data")
+        if str(at_r).startswith("no data"):
+            self.atomic_radius = None
+        else:
+            self.atomic_radius = Length(at_r, "ang")
+        self.atomic_mass = Mass(d["Atomic mass"], "amu")
+        self._data = d
+
+    @property
+    def X(self):
+        if "X" in self._data:
+            return self._data["X"]
+        else:
+            warnings.warn("No electronegativity for %s. Setting to infinity. "
+                          "This has no physical meaning, and is mainly done to "
+                          "avoid errors caused by the code expecting a float."
+                          % self.symbol)
+            return float("inf")
+
+    def __getattr__(self, item):
+        if item in ["mendeleev_no", "electrical_resistivity",
+                    "velocity_of_sound", "reflectivity",
+                    "refractive_index", "poissons_ratio", "molar_volume",
+                    "electronic_structure", "thermal_conductivity",
+                    "boiling_point", "melting_point",
+                    "critical_temperature", "superconduction_temperature",
+                    "liquid_range", "bulk_modulus", "youngs_modulus",
+                    "brinell_hardness", "rigidity_modulus",
+                    "mineral_hardness", "vickers_hardness",
+                    "density_of_solid", "atomic_radius_calculated",
+                    "van_der_waals_radius",
+                    "coefficient_of_linear_thermal_expansion"]:
+            kstr = item.capitalize().replace("_", " ")
+            val = self._data.get(kstr, None)
             if str(val).startswith("no data"):
                 val = None
             else:
                 try:
                     val = float(val)
                 except ValueError:
-                    toks_nobracket = re.sub(r'\(.*\)', "", val)
-                    toks = toks_nobracket.replace("about", "").strip().split(" ", 1)
+                    nobracket = re.sub(r'\(.*\)', "", val)
+                    toks = nobracket.replace("about", "").strip().split(" ", 1)
                     if len(toks) == 2:
                         try:
                             if "10<sup>" in toks[1]:
                                 base_power = re.findall(r'([+-]?\d+)', toks[1])
                                 factor = "e" + base_power[1]
                                 toks[0] += factor
-                                if a == "electrical_resistivity":
+                                if item == "electrical_resistivity":
                                     unit = "ohm m"
-                                elif a == "coefficient_of_linear_thermal_expansion":
+                                elif (
+                                    item ==
+                                    "coefficient_of_linear_thermal_expansion"
+                                ):
                                     unit = "K^-1"
                                 else:
                                     unit = toks[1]
@@ -422,18 +442,14 @@ class Element(Enum):
                                     "</sup>", "").replace("&Omega;",
                                                           "ohm")
                                 units = Unit(unit)
-                                if set(units.keys()).issubset(SUPPORTED_UNIT_NAMES):
+                                if set(units.keys()).issubset(
+                                        SUPPORTED_UNIT_NAMES):
                                     val = FloatWithUnit(toks[0], unit)
                         except ValueError as ex:
                             # Ignore error. val will just remain a string.
                             pass
-            setattr(self, a, val)
-        if str(d.get("Atomic radius", "no data")).startswith("no data"):
-            self.atomic_radius = None
-        else:
-            self.atomic_radius = Length(d["Atomic radius"], "ang")
-        self.atomic_mass = Mass(d["Atomic mass"], "amu")
-        self._data = d
+            return val
+        raise AttributeError
 
     @property
     def data(self):
@@ -507,7 +523,7 @@ class Element(Enum):
         estr = self._data["Electronic structure"]
 
         def parse_orbital(orbstr):
-            m = re.match("(\d+)([spdfg]+)<sup>(\d+)</sup>", orbstr)
+            m = re.match(r"(\d+)([spdfg]+)<sup>(\d+)</sup>", orbstr)
             if m:
                 return int(m.group(1)), m.group(2), int(m.group(3))
             return orbstr
@@ -653,7 +669,8 @@ class Element(Enum):
         Return the block character "s,p,d,f"
         """
         block = ""
-        if (self.is_actinoid or self.is_lanthanoid) and self.Z not in [71, 103]:
+        if (self.is_actinoid or self.is_lanthanoid) and \
+                self.Z not in [71, 103]:
             block = "f"
         elif self.is_actinoid or self.is_lanthanoid:
             block = "d"
@@ -664,7 +681,7 @@ class Element(Enum):
         elif self.group in range(3, 13):
             block = "d"
         else:
-            print("unable to determine block")
+            raise ValueError("unable to determine block")
         return block
 
     @property
@@ -836,7 +853,7 @@ class Specie(MSONable):
 
     supported_properties = ("spin",)
 
-    def __init__(self, symbol, oxidation_state, properties=None):
+    def __init__(self, symbol, oxidation_state=None, properties=None):
         self._el = Element(symbol)
         self._oxi_state = oxidation_state
         self._properties = properties if properties else {}
@@ -845,7 +862,7 @@ class Specie(MSONable):
                 raise ValueError("{} is not a supported property".format(k))
 
     def __getattr__(self, a):
-        # overriding getattr doens't play nice with pickle, so we
+        # overriding getattr doesn't play nice with pickle, so we
         # can't use self._properties
         p = object.__getattribute__(self, '_properties')
         if a in p:
@@ -861,7 +878,7 @@ class Specie(MSONable):
         exactly the same.
         """
         return isinstance(other, Specie) and self.symbol == other.symbol \
-            and self._oxi_state == other._oxi_state \
+            and self.oxi_state == other.oxi_state \
             and self._properties == other._properties
 
     def __ne__(self, other):
@@ -869,11 +886,11 @@ class Specie(MSONable):
 
     def __hash__(self):
         """
-        Given that all oxidation states are below 100 in absolute value, this
-        should effectively ensure that no two unequal Specie have the same
-        hash.
+        Equal Specie should have the same str representation, hence
+        should hash equally. Unequal Specie will have differnt str
+        representations.
         """
-        return self._el.Z * 1000 + int(self._oxi_state)
+        return self.__str__().__hash__()
 
     def __lt__(self, other):
         """
@@ -902,7 +919,21 @@ class Specie(MSONable):
         """
         Ionic radius of specie. Returns None if data is not present.
         """
-        return self.ionic_radii.get(self._oxi_state, None)
+
+        if self._oxi_state in self.ionic_radii:
+            return self.ionic_radii[self._oxi_state]
+        d = self._el.data
+        oxstr = str(int(self._oxi_state))
+        if oxstr in d.get("Ionic radii hs", {}):
+            warnings.warn("No default ionic radius for %s. Using hs data." %
+                          self)
+            return d["Ionic radii hs"][oxstr]
+        elif oxstr in d.get("Ionic radii ls", {}):
+            warnings.warn("No default ionic radius for %s. Using ls data." %
+                          self)
+            return d["Ionic radii ls"][oxstr]
+        warnings.warn("No ionic radius for {}!".format(self))
+        return None
 
     @property
     def oxi_state(self):
@@ -926,14 +957,14 @@ class Specie(MSONable):
         Raises:
             ValueError if species_string cannot be intepreted.
         """
-        m = re.search("([A-Z][a-z]*)([0-9\.]*)([\+\-])(.*)", species_string)
+        m = re.search(r"([A-Z][a-z]*)([0-9\.]*)([\+\-])(.*)", species_string)
         if m:
             sym = m.group(1)
             oxi = 1 if m.group(2) == "" else float(m.group(2))
             oxi = -oxi if m.group(3) == "-" else oxi
             properties = None
             if m.group(4):
-                toks = m.group(4).split("=")
+                toks = m.group(4).replace(",","").split("=")
                 properties = {toks[0]: float(toks[1])}
             return Specie(sym, oxi, properties)
         else:
@@ -944,12 +975,13 @@ class Specie(MSONable):
 
     def __str__(self):
         output = self.symbol
-        if self._oxi_state >= 0:
-            output += formula_double_format(self._oxi_state) + "+"
-        else:
-            output += formula_double_format(-self._oxi_state) + "-"
+        if self.oxi_state is not None:
+            if self.oxi_state >= 0:
+                output += formula_double_format(self.oxi_state) + "+"
+            else:
+                output += formula_double_format(-self.oxi_state) + "-"
         for p, v in self._properties.items():
-            output += "%s=%s" % (p, v)
+            output += ",%s=%s" % (p, v)
         return output
 
     def get_crystal_field_spin(self, coordination="oct", spin_config="high"):
@@ -978,7 +1010,7 @@ class Specie(MSONable):
                 "Invalid element {} for crystal field calculation.".format(
                     self.symbol))
         nelectrons = elec[-1][2] + elec[-2][2] - self.oxi_state
-        if nelectrons < 0:
+        if nelectrons < 0 or nelectrons > 10:
             raise AttributeError(
                 "Invalid oxidation state {} for element {}"
                 .format(self.oxi_state, self.symbol))
@@ -1082,7 +1114,7 @@ class DummySpecie(Specie):
             raise AttributeError(a)
 
     def __hash__(self):
-        return 1
+        return self.symbol.__hash__()
 
     def __eq__(self, other):
         """
@@ -1115,9 +1147,11 @@ class DummySpecie(Specie):
     @property
     def Z(self):
         """
-        DummySpecie is always assigned an atomic number of 0.
+        DummySpecie is always assigned an atomic number equal to the hash of
+        the symbol. The expectation is that someone would be an actual dummy
+        to use atomic numbers for a Dummy specie.
         """
-        return 0
+        return self.symbol.__hash__()
 
     @property
     def oxi_state(self):
@@ -1129,7 +1163,8 @@ class DummySpecie(Specie):
     @property
     def X(self):
         """
-        DummySpecie is always assigned an electronegativity of 0.
+        DummySpecie is always assigned an electronegativity of 0. The effect of
+        this is that DummySpecie are always sorted in front of actual Specie.
         """
         return 0
 
@@ -1155,7 +1190,7 @@ class DummySpecie(Specie):
         Raises:
             ValueError if species_string cannot be intepreted.
         """
-        m = re.search("([A-Z][a-z]*)([0-9\.]*)([\+\-]*)(.*)", species_string)
+        m = re.search(r"([A-Z][a-z]*)([0-9.]*)([+\-]*)(.*)", species_string)
         if m:
             sym = m.group(1)
             if m.group(2) == "" and m.group(3) == "":
@@ -1212,78 +1247,6 @@ class DummySpecie(Specie):
         return output
 
 
-@deprecated(message="PeriodicTable itself is now pretty useless now that "
-                    "Element is an Enum. You can simply iterate over all "
-                    "elements using for el in Element. print_periodic_table "
-                    "functionality has been moved to a staticmethod in "
-                    "Element. This class will be removed in pymatgen 4.0.")
-class PeriodicTable(object):
-    """
-    A Periodic table singleton class. This class contains methods on the
-    collection of all known elements. For example, printing all elements, etc.
-    """
-
-    def __init__(self):
-        """ Implementation of the singleton interface """
-        self._all_elements = dict()
-        for sym in _pt_data.keys():
-            self._all_elements[sym] = Element(sym)
-
-    @property
-    def all_symbols(self):
-        """tuple with element symbols ordered by Z."""
-        return sorted(self._all_elements.keys(), key=lambda s: Element(s).Z)
-
-    def __getattr__(self, name):
-        return self._all_elements[name]
-
-    def __iter__(self):
-        for sym in self.all_symbols:
-            if sym is not None:
-                yield self._all_elements[sym]
-
-    def __getitem__(self, Z_or_slice):
-        try:
-            if isinstance(Z_or_slice, slice):
-                return [Element.from_Z(z) for z in list(range(
-                        len(self.all_symbols)))[Z_or_slice]]
-            else:
-                return Element.from_Z(Z_or_slice)
-        except Exception as ex:
-            raise IndexError("Z_or_slice: %s" % str(Z_or_slice))
-
-    @property
-    def all_elements(self):
-        """
-        List of all known elements as Element objects.
-        """
-        return self._all_elements.values()
-
-    def print_periodic_table(self, filter_function=None):
-        """
-        A pretty ASCII printer for the periodic table, based on some
-        filter_function.
-
-        Args:
-            filter_function: A filtering function taking an Element as input
-                and returning a boolean. For example, setting
-                filter_function = lambda el: el.X > 2 will print a periodic
-                table containing only elements with electronegativity > 2.
-        """
-        for row in range(1, 10):
-            rowstr = []
-            for group in range(1, 19):
-                try:
-                    el = Element.from_row_and_group(row, group)
-                except ValueError:
-                    el = None
-                if el and ((not filter_function) or filter_function(el)):
-                    rowstr.append("{:3s}".format(el.symbol))
-                else:
-                    rowstr.append("   ")
-            print(" ".join(rowstr))
-
-
 def get_el_sp(obj):
     """
     Utility method to get an Element or Specie from an input obj.
@@ -1328,6 +1291,5 @@ def get_el_sp(obj):
             try:
                 return DummySpecie.from_string(obj)
             except:
-                raise ValueError(
-                        "Can't parse Element or String from type %s: %s."
-                        % (type(obj), obj))
+                raise ValueError("Can't parse Element or String from type"
+                                 " %s: %s." % (type(obj), obj))
