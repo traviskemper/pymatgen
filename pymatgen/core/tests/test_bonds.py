@@ -17,9 +17,12 @@ __email__ = "shyuep@gmail.com"
 __date__ = "Jul 26, 2012"
 
 import unittest2 as unittest
+import sys, os
+# Get util 
+sys.path.append(os.path.abspath(os.path.join('..', '')))
 
-from pymatgen.core.bonds import CovalentBond, get_bond_length
-from pymatgen.core.sites import Site
+from bonds import CovalentBond, get_bond_length
+from sites import Site
 
 
 class CovalentBondTest(unittest.TestCase):

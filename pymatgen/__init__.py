@@ -1,5 +1,7 @@
 from __future__ import unicode_literals
 
+__all__ = ['core','io','util']
+
 __author__ = "Pymatgen Development Team"
 __email__ ="pymatgen@googlegroups.com"
 __maintainer__ = "Shyue Ping Ong"
