@@ -6,6 +6,9 @@ from __future__ import division, unicode_literals
 
 import collections
 
+import unittest2 as unittest
+
+
 from pymatgen.util.testing import PymatgenTest
 from pymatgen.core.units import (Energy, Time, Length, unitized, Mass, Memory,
                                  EnergyArray, TimeArray, LengthArray, Unit,

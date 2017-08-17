@@ -2,14 +2,15 @@
 # Copyright (c) Pymatgen Development Team.
 # Distributed under the terms of the MIT License.
 
+
+
 from __future__ import division, unicode_literals
 
 import unittest2 as unittest
 import pickle
-
-from pymatgen.core.periodic_table import Element, Specie, DummySpecie, get_el_sp
 from copy import deepcopy
 
+from pymatgen.core.periodic_table import Element, Specie, DummySpecie, get_el_sp
 
 class ElementTestCase(unittest.TestCase):
 

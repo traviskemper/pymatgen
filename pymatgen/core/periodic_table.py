@@ -981,7 +981,7 @@ class Specie(MSONable):
             else:
                 output += formula_double_format(-self.oxi_state) + "-"
         for p, v in self._properties.items():
-            output += ",%s=%s" % (p, v)
+            output += "%s=%s" % (p, v)
         return output
 
     def get_crystal_field_spin(self, coordination="oct", spin_config="high"):
