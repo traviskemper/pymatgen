@@ -2,9 +2,9 @@
 
 This is light version of pymatgen that only includes:
 
-    pymatgen.core.periodic_table
-    pymatgen.core.units
-    pymatgen.util.string
+* pymatgen.core.periodic_table
+* pymatgen.core.units
+* pymatgen.util.string
 
 
 Pymatgen (Python Materials Genomics) is a robust, open-source Python library
