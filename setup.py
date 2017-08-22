@@ -174,9 +174,9 @@ setup(
     # ext_modules=[Extension("pymatgen.optimization.linear_assignment",
     #                        ["pymatgen/optimization/linear_assignment.c"],
     #                        extra_link_args=extra_link_args),
-    #              Extension("pymatgen.util.coord_utils_cython",
-    #                        ["pymatgen/util/coord_utils_cython.c"],
-    #                        extra_link_args=extra_link_args)],
+    ext_modules=[Extension("pymatgen.util.coord_utils_cython",
+                            ["pymatgen/util/coord_utils_cython.c"],
+                            extra_link_args=extra_link_args)],
     #entry_points={
     ##      'console_scripts': [
     #          'pmg = pymatgen.cli.pmg:main',
