@@ -7,11 +7,15 @@ from __future__ import division, unicode_literals
 import itertools
 from pymatgen.core.lattice import Lattice
 import numpy as np
-from pymatgen.util.testing import PymatgenTest
-from pymatgen.core.operations import SymmOp
 
 
-class LatticeTestCase(PymatgenTest):
+import unittest2 as unittest
+import numpy.testing.utils as nptu
+
+# from pymatgen.core.operations import SymmOp
+
+
+class LatticeTestCase(unittest.TestCase):
 
     def setUp(self):
         self.lattice = Lattice.cubic(10.0)
