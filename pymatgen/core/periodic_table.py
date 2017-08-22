@@ -918,9 +918,10 @@ class Specie(MSONable):
         """
         Ionic radius of specie. Returns None if data is not present.
         """
-
-        if self._oxi_state in self.ionic_radii:
-            return self.ionic_radii[self._oxi_state]
+        radii = self.ionic_radii()
+        
+        if self._oxi_state in radii:
+            return radii[self._oxi_state]
         d = self._el.data
         oxstr = str(int(self._oxi_state))
         if oxstr in d.get("Ionic radii hs", {}):
