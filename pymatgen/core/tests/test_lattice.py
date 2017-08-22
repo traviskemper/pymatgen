@@ -62,8 +62,8 @@ class LatticeTestCase(unittest.TestCase):
 
     def test_get_cartesian_or_frac_coord(self):
         coord = self.lattice.get_cartesian_coords([0.15, 0.3, 0.4])
-        self.assertArrayAlmostEqual(coord, [1.5, 3., 4.])
-        self.assertArrayAlmostEqual(
+        nptu.assert_almost_equal(coord, [1.5, 3., 4.])
+        nptu.assert_almost_equal(
             self.tetragonal.get_fractional_coords([12.12312, 45.2134,
                                                    1.3434]),
             [1.212312, 4.52134, 0.06717])
@@ -72,19 +72,19 @@ class LatticeTestCase(unittest.TestCase):
         rand_coord = np.random.random_sample(3)
         coord = self.tetragonal.get_cartesian_coords(rand_coord)
         fcoord = self.tetragonal.get_fractional_coords(coord)
-        self.assertArrayAlmostEqual(fcoord, rand_coord)
+        nptu.assert_almost_equal(fcoord, rand_coord)
 
     def test_reciprocal_lattice(self):
         recip_latt = self.lattice.reciprocal_lattice
-        self.assertArrayAlmostEqual(recip_latt.matrix,
+        nptu.assert_almost_equal(recip_latt.matrix,
                                     0.628319 * np.eye(3), 5)
-        self.assertArrayAlmostEqual(self.tetragonal.reciprocal_lattice.matrix,
+        nptu.assert_almost_equal(self.tetragonal.reciprocal_lattice.matrix,
                                     [[0.628319, 0., 0.], [0., 0.628319, 0],
                                      [0., 0., 0.3141590]], 5)
 
         #Test the crystallographic version.
         recip_latt_xtal = self.lattice.reciprocal_lattice_crystallographic
-        self.assertArrayAlmostEqual(recip_latt.matrix,
+        nptu.assert_almost_equal(recip_latt.matrix,
                                     recip_latt_xtal.matrix * 2 * np.pi,
                                     5)
 
@@ -149,7 +149,7 @@ class LatticeTestCase(unittest.TestCase):
             np.linalg.det(np.linalg.solve(expected_ans.matrix,
                                           reduced_latt.matrix)),
             1)
-        self.assertArrayAlmostEqual(
+        nptu.assert_almost_equal(
             sorted(reduced_latt.abc), sorted(expected_ans.abc))
         self.assertAlmostEqual(reduced_latt.volume, lattice.volume)
         latt = [7.164750, 2.481942, 0.000000,
@@ -163,7 +163,7 @@ class LatticeTestCase(unittest.TestCase):
             np.linalg.det(np.linalg.solve(expected_ans.matrix,
                                           reduced_latt.matrix)),
             1)
-        self.assertArrayAlmostEqual(
+        nptu.assert_almost_equal(
             sorted(reduced_latt.abc), sorted(expected_ans.abc))
 
         expected_ans = Lattice([0.0, 10.0, 10.0,
@@ -178,7 +178,7 @@ class LatticeTestCase(unittest.TestCase):
             np.linalg.det(np.linalg.solve(expected_ans.matrix,
                                           reduced_latt.matrix)),
             1)
-        self.assertArrayAlmostEqual(
+        nptu.assert_almost_equal(
             sorted(reduced_latt.abc), sorted(expected_ans.abc))
 
         random_latt = Lattice(np.random.random((3, 3)))
@@ -214,7 +214,7 @@ class LatticeTestCase(unittest.TestCase):
         ans = [[-1.432950, -2.481942, 0.0],
                [-2.8659, 0.0, 0.0],
                [-1.432950, -0.827314, -4.751000]]
-        self.assertArrayAlmostEqual(latt.get_niggli_reduced_lattice().matrix,
+        nptu.assert_almost_equal(latt.get_niggli_reduced_lattice().matrix,
                                     ans)
 
         latt = Lattice.from_parameters(7.365450, 6.199506, 5.353878,
@@ -222,7 +222,7 @@ class LatticeTestCase(unittest.TestCase):
         ans = [[2.578932, 0.826965, 0.000000],
                [-0.831059, 2.067413, 1.547813],
                [-0.458407, -2.480895, 1.129126]]
-        self.assertArrayAlmostEqual(latt.get_niggli_reduced_lattice().matrix,
+        nptu.assert_almost_equal(latt.get_niggli_reduced_lattice().matrix,
                                     np.array(ans), 5)
     '''
     def test_find_mapping(self):
@@ -239,9 +239,9 @@ class LatticeTestCase(unittest.TestCase):
 
         rotated = SymmOp.from_rotation_and_translation(rot_out).operate_multi(latt.matrix)
 
-        self.assertArrayAlmostEqual(rotated, aligned_out.matrix)
-        self.assertArrayAlmostEqual(np.dot(scale_out, latt2.matrix), aligned_out.matrix)
-        self.assertArrayAlmostEqual(aligned_out.lengths_and_angles, latt.lengths_and_angles)
+        nptu.assert_almost_equal(rotated, aligned_out.matrix)
+        nptu.assert_almost_equal(np.dot(scale_out, latt2.matrix), aligned_out.matrix)
+        nptu.assert_almost_equal(aligned_out.lengths_and_angles, latt.lengths_and_angles)
         self.assertFalse(np.allclose(aligned_out.lengths_and_angles,
                                      latt2.lengths_and_angles))
 
@@ -256,11 +256,11 @@ class LatticeTestCase(unittest.TestCase):
         latt2 = Lattice(np.dot(rot, np.dot(scale, m).T).T)
 
         for (aligned_out, rot_out, scale_out) in latt.find_all_mappings(latt2):
-            self.assertArrayAlmostEqual(np.inner(latt2.matrix, rot_out),
+            nptu.assert_almost_equal(np.inner(latt2.matrix, rot_out),
                                         aligned_out.matrix, 5)
-            self.assertArrayAlmostEqual(np.dot(scale_out, latt.matrix),
+            nptu.assert_almost_equal(np.dot(scale_out, latt.matrix),
                                         aligned_out.matrix)
-            self.assertArrayAlmostEqual(aligned_out.lengths_and_angles, latt2.lengths_and_angles)
+            nptu.assert_almost_equal(aligned_out.lengths_and_angles, latt2.lengths_and_angles)
             self.assertFalse(np.allclose(aligned_out.lengths_and_angles,
                                          latt.lengths_and_angles))
 
@@ -301,7 +301,7 @@ class LatticeTestCase(unittest.TestCase):
         for (family_name, lattice) in self.families.items():
             new_lattice = lattice.scale(new_volume)
             self.assertAlmostEqual(new_lattice.volume, new_volume)
-            self.assertArrayAlmostEqual(new_lattice.angles, lattice.angles)
+            nptu.assert_almost_equal(new_lattice.angles, lattice.angles)
 
     def test_get_wigner_seitz_cell(self):
         ws_cell = Lattice([[10, 0, 0], [0, 5, 0], [0, 0, 1]])\
@@ -315,11 +315,11 @@ class LatticeTestCase(unittest.TestCase):
 
         for family_name, lattice in self.families.items():
             #print(family_name)
-            self.assertArrayEqual(lattice.norm(lattice.matrix, frac_coords=False), lattice.abc)
-            self.assertArrayEqual(lattice.norm(frac_basis), lattice.abc)
+            nptu.assert_equal(lattice.norm(lattice.matrix, frac_coords=False), lattice.abc)
+            nptu.assert_equal(lattice.norm(frac_basis), lattice.abc)
             for (i, vec) in enumerate(frac_basis):
                 length = lattice.norm(vec)
-                self.assertArrayEqual(length[0], lattice.abc[i])
+                nptu.assert_equal(length[0], lattice.abc[i])
                 # We always get a ndarray.
                 self.assertTrue(hasattr(length, "shape"))
 
@@ -361,10 +361,10 @@ class LatticeTestCase(unittest.TestCase):
                              [3.519, 1.131, 2.251, 0.000, 3.852],
                              [3.245, 4.453, 1.788, 3.852, 0.000]])
         output = lattice.get_all_distances(fcoords, fcoords)
-        self.assertArrayAlmostEqual(output, expected, 3)
+        nptu.assert_almost_equal(output, expected, 3)
         #test just one input point
         output2 = lattice.get_all_distances(fcoords[0], fcoords)
-        self.assertArrayAlmostEqual(output2, [expected[0]], 2)
+        nptu.assert_almost_equal(output2, [expected[0]], 2)
         #test distance when initial points are not in unit cell
         f1 = [0, 0, 17]
         f2 = [0, 0, 10]
@@ -388,7 +388,7 @@ class LatticeTestCase(unittest.TestCase):
         dist, image = self.cubic.get_distance_and_image([0, 0, 0.1],
                                                         [0, 0., 0.9])
         self.assertAlmostEqual(dist, 2)
-        self.assertArrayAlmostEqual(image, [0, 0, -1])
+        nptu.assert_almost_equal(image, [0, 0, -1])
 
     def test_get_all_distance_and_image(self):
         r = self.cubic.get_all_distance_and_image([0, 0, 0.1],
@@ -396,10 +396,10 @@ class LatticeTestCase(unittest.TestCase):
         self.assertEqual(len(r), 27)
         dist, image = min(r, key=lambda x: x[0])
         self.assertAlmostEqual(dist, 2)
-        self.assertArrayAlmostEqual(image, [0, 0, -1])
+        nptu.assert_almost_equal(image, [0, 0, -1])
         dist, image = max(r, key=lambda x: x[0])
         self.assertAlmostEqual(dist, 22.891046284519195)
-        self.assertArrayAlmostEqual(image, [-1, -1, 1])
+        nptu.assert_almost_equal(image, [-1, -1, 1])
 
     def test_get_distance_and_image_strict(self):
         for count in range(10):
@@ -422,7 +422,7 @@ class LatticeTestCase(unittest.TestCase):
             pmg_result = lattice.get_distance_and_image(f1, f2)
             self.assertGreaterEqual(min_image_dist[0] + 1e-7, pmg_result[0])
             if abs(min_image_dist[0] - pmg_result[0]) < 1e-12:
-                self.assertArrayAlmostEqual(min_image_dist[1], pmg_result[1])
+                nptu.assert_almost_equal(min_image_dist[1], pmg_result[1])
 
     def test_lll_basis(self):
         a = np.array([1., 0.1, 0.])
@@ -436,20 +436,20 @@ class LatticeTestCase(unittest.TestCase):
         l1_fcoords = l1.get_fractional_coords(ccoords)
         l2_fcoords = l2.get_fractional_coords(ccoords)
 
-        self.assertArrayAlmostEqual(l1.matrix, l2.lll_matrix)
-        self.assertArrayAlmostEqual(np.dot(l2.lll_mapping, l2.matrix),
+        nptu.assert_almost_equal(l1.matrix, l2.lll_matrix)
+        nptu.assert_almost_equal(np.dot(l2.lll_mapping, l2.matrix),
                                     l1.matrix)
 
-        self.assertArrayAlmostEqual(np.dot(l2_fcoords, l2.matrix),
+        nptu.assert_almost_equal(np.dot(l2_fcoords, l2.matrix),
                                     np.dot(l1_fcoords, l1.matrix))
 
         lll_fcoords = l2.get_lll_frac_coords(l2_fcoords)
 
-        self.assertArrayAlmostEqual(lll_fcoords, l1_fcoords)
-        self.assertArrayAlmostEqual(l1.get_cartesian_coords(lll_fcoords),
+        nptu.assert_almost_equal(lll_fcoords, l1_fcoords)
+        nptu.assert_almost_equal(l1.get_cartesian_coords(lll_fcoords),
                                     np.dot(lll_fcoords, l2.lll_matrix))
 
-        self.assertArrayAlmostEqual(l2.get_frac_coords_from_lll(lll_fcoords),
+        nptu.assert_almost_equal(l2.get_frac_coords_from_lll(lll_fcoords),
                                     l2_fcoords)
 
 
