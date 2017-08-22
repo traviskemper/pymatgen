@@ -471,7 +471,6 @@ class Element(Enum):
         else:
             return 0
 
-    @property
     @unitized("ang")
     def ionic_radii(self):
         """
