@@ -273,28 +273,6 @@ class Lattice(MSONable):
                                        ang[0], ang[1], ang[2])
 
 
-    def update_latconst(self,a, b, c, alpha, beta, gamma):
-        """
-        Convert lattice constants  to lattice  vectors.  
-        
-        Args:
-            math:: box = (list) [a,b,c,\alpha (degree),\beta (degree),\gamma (degree)]
-        
-        math::
-        
-        matrix_{0,0} = a
-        matrix_{1,0} = cos(\gamma) x b
-        matrix_{1,1} = sin(\gamma) x b
-        matrix_{2,0} = 
-        matrix_{2,1} = 
-        matrix_{2,2} = 
-        matrix_{0,0} = 
-        
-        Need to double check from materials book
-        
-        """
-        
-        
         
     @staticmethod
     def from_parameters( a, b, c, alpha, beta, gamma):
