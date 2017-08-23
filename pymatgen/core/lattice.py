@@ -272,8 +272,32 @@ class Lattice(MSONable):
         return Lattice.from_parameters(abc[0], abc[1], abc[2],
                                        ang[0], ang[1], ang[2])
 
+
+    def update_latconst(self,a, b, c, alpha, beta, gamma):
+        """
+        Convert lattice constants  to lattice  vectors.  
+        
+        Args:
+            math:: box = (list) [a,b,c,\alpha (degree),\beta (degree),\gamma (degree)]
+        
+        math::
+        
+        matrix_{0,0} = a
+        matrix_{1,0} = cos(\gamma) x b
+        matrix_{1,1} = sin(\gamma) x b
+        matrix_{2,0} = 
+        matrix_{2,1} = 
+        matrix_{2,2} = 
+        matrix_{0,0} = 
+        
+        Need to double check from materials book
+        
+        """
+        
+        
+        
     @staticmethod
-    def from_parameters(a, b, c, alpha, beta, gamma):
+    def from_parameters( a, b, c, alpha, beta, gamma):
         """
         Create a Lattice using unit cell lengths and angles (in degrees).
 
@@ -302,6 +326,7 @@ class Lattice(MSONable):
                     b * np.sin(alpha_r) * np.sin(gamma_star),
                     b * np.cos(alpha_r)]
         vector_c = [0.0, 0.0, float(c)]
+        
         return Lattice([vector_a, vector_b, vector_c])
 
     @classmethod
