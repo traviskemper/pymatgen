@@ -61,12 +61,24 @@ class Lattice(MSONable):
                 E.g., [[10, 0, 0], [20, 10, 0], [0, 0, 30]] specifies a lattice
                 with lattice vectors [10, 0, 0], [20, 10, 0] and [0, 0, 30].
         """
-        m = np.array(matrix, dtype=np.float64).reshape((3, 3))
+        self.n_dim = int(3) # Number of spatial dimensions
+        self.set_matrix(matrix)
+            
+    def set_matrix(self,matrix):
+        '''
+        Set the matrix values and reset lengths and angles accordingly
+        
+        Args:
+            matrix (list) of length n_dim x n_dim
+        
+        
+        '''        
+        m = np.array(matrix, dtype=np.float64).reshape((self.n_dim, self.n_dim))
         lengths = np.sqrt(np.sum(m ** 2, axis=1))
-        angles = np.zeros(3)
-        for i in range(3):
-            j = (i + 1) % 3
-            k = (i + 2) % 3
+        angles = np.zeros(self.n_dim)
+        for i in range(self.n_dim):
+            j = (i + 1) % self.n_dim
+            k = (i + 2) % self.n_dim
             angles[i] = abs_cap(dot(m[j], m[k]) / (lengths[j] * lengths[k]))
 
         self._angles = np.arccos(angles) * 180. / pi
