@@ -66,7 +66,8 @@ class Lattice(MSONable):
             
     def set_matrix(self,matrix):
         '''
-        Set the matrix values and reset lengths and angles accordingly
+        Set the values of the matrix of lattice vectors
+        and reset lengths and angles accordingly
         
         Args:
             matrix (list) of length n_dim x n_dim

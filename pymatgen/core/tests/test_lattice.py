@@ -477,7 +477,8 @@ class TestLattice(unittest.TestCase):
         self.assertEqual(self.lat._angles[0],90.0)
         self.assertEqual(self.lat._angles[1],90.0)
         self.assertEqual(self.lat._angles[2],90.0)
-                
+        
+
     def tearDown(self):
         del self.lat 
         self.lat = None

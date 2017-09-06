@@ -13,6 +13,7 @@ import collections
 from six.moves import zip
 
 
+
 def abs_cap(val, max_abs_val=1):
     """
     Returns the value with its absolute value capped at max_abs_val.
